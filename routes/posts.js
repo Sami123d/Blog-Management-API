@@ -5,6 +5,7 @@ const authorizeRoles = require('../middleware/roles');
 const Post = require('../models/Post');
 const Comment = require('../models/Comment');
 const mongoose = require('mongoose');
+const ImageKit = require("imagekit");
 
 // Public: get published posts with search & pagination
 router.get('/', async (req, res) => {
@@ -12,16 +13,32 @@ router.get('/', async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(50, parseInt(req.query.limit) || 10);
     const skip = (page - 1) * limit;
-    const { search, tags, sortBy = 'createdAt', order = 'desc' } = req.query;
+
+    const { search, tags, sortBy = 'createdAt', order = 'desc', author, cat } = req.query;
 
     const filter = { status: 'published' };
-    if (search) filter.$text = { $search: search };
-    if (tags) filter.tags = { $in: tags.split(',') };
-console.log("SEARCH QUERY:", search);
-console.log("FILTER:", filter);
 
+    // 🔍 Full-text search
+    if (search) filter.$text = { $search: search };
+
+    // 🏷️ Tags filter
+    if (tags) filter.tags = { $in: tags.split(',') };
+
+    // 👤 Author Filter
+    if (author) filter.author = author;
+
+       if (cat) filter.category = cat;
+
+    console.log("FINAL FILTER:", filter);
+
+    // Parallel fetch + count
     const [posts, total] = await Promise.all([
-      Post.find(filter).sort({ [sortBy]: order === 'asc' ? 1 : -1 }).skip(skip).limit(limit).populate('author', 'name'),
+      Post.find(filter)
+        .sort({ [sortBy]: order === 'asc' ? 1 : -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('author', 'name'),
+
       Post.countDocuments(filter)
     ]);
 
@@ -35,8 +52,52 @@ console.log("FILTER:", filter);
         hasPrev: page > 1
       }
     });
-  } catch (err) { res.status(500).json({ message: 'Server error' }); }
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
+
+
+// CREATE IMAGEKIT INSTANCE
+const imagekit = new ImageKit({
+  publicKey: process.env.VITE_IK_PUBLIC_KEY,
+  privateKey: process.env.PRIVATE_KEY,
+  urlEndpoint: process.env.VITE_IK_URL_ENDPOINT,
+});
+
+// ---------- UPLOAD AUTH ROUTE ---------- //
+router.get("/upload-auth", (req, res) => {
+  try {
+    const authParams = imagekit.getAuthenticationParameters();
+    return res.status(200).json(authParams);
+  } catch (error) {
+    console.error("Upload Auth Error:", error);
+    return res.status(500).json({ message: "Auth generation failed" });
+  }
+});
+
+// Get single post by slug
+// GET SINGLE POST BY SLUG
+router.get("/:slug", async (req, res) => {
+  try {
+    const post = await Post.findOne({ slug: req.params.slug })
+      .populate("author", "name");
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found!" });
+    }
+
+    res.status(200).json(post);
+
+  } catch (error) {
+    console.error("Error fetching single post:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
 
 // Author's posts (draft + published)
 router.get('/my', auth, async (req, res) => {
@@ -49,12 +110,37 @@ router.get('/my', auth, async (req, res) => {
 // Create post (author/admin)
 router.post('/', auth, authorizeRoles('author','admin'), async (req, res) => {
   try {
-    const { title, content, tags = [], status = 'draft' } = req.body;
+    const { 
+      title, 
+      category, 
+      description, 
+      content, 
+      img, 
+      tags = [], 
+      status = 'draft' 
+    } = req.body;
+
     const slug = title.toLowerCase().replace(/\s+/g,'-') + '-' + Date.now().toString().slice(-4);
-    const post = new Post({ title, slug, content, tags, status, author: req.user.id });
+
+    const post = new Post({
+      title,
+      slug,
+      category,
+      description,
+      content,
+      img,
+      tags,
+      status,
+      author: req.user.id
+    });
+
     await post.save();
     res.status(201).json(post);
-  } catch (err) { res.status(500).json({ message: 'Server error' }); }
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 // Update post (owner or admin)
@@ -65,7 +151,7 @@ router.put('/:id', auth, async (req, res) => {
     if (post.author.toString() !== req.user.id && req.user.role !== 'admin') 
       return res.status(403).json({ message: 'Not allowed' });
 
-    const allowed = ['title','content','tags','status'];
+const allowed = ['title','category','description','content','tags','status','img'];
     allowed.forEach(k => { if (req.body[k] !== undefined) post[k] = req.body[k]; });
     await post.save();
     res.json(post);
