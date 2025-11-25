@@ -12,7 +12,7 @@ const app = express();
 // Middlewares
 // app.use(cors());
 app.use(cors({
-  origin: "*" // or your frontend URL
+  origin: "https://blog-management-nine-neon.vercel.app" // or your frontend URL
 }));
 
 // app.use(express.json());
