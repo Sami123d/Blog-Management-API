@@ -12,13 +12,14 @@ const createRefreshToken = (user) => jwt.sign({ id: user._id }, process.env.JWT_
 router.post('/register', [
   body('name').notEmpty(),
   body('email').isEmail(),
+  body('phone').notEmpty(),
   body('password').isLength({ min: 6 })
 ], async (req, res) => {
     console.log("regoster chl gyi")
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-  const { name, email, password, role } = req.body;
+  const { name, email, phone, password, role } = req.body;
   console.log(req.body, "reqbppdy")
   try {
     let user = await User.findOne({ email });
@@ -28,7 +29,7 @@ router.post('/register', [
     const salt = await bcrypt.genSalt(10);
     const hashed = await bcrypt.hash(password, salt);
 
-    user = new User({ name, email, password: hashed, role });
+    user = new User({ name, email, phone, password: hashed, role });
     console.log(user, "userrop");
     
     await user.save();

@@ -12,8 +12,10 @@ const app = express();
 // Middlewares
 // app.use(cors());
 app.use(cors({
-  origin: "https://blog-management-nine-neon.vercel.app" // or your frontend URL
+  origin: ["http://localhost:5173", "https://blog-management-nine-neon.vercel.app"],
+  credentials: true
 }));
+
 
 // app.use(express.json());
 app.use(express.json({ strict: false }));
@@ -28,6 +30,7 @@ app.use(express.json({ strict: false }));
 // Import Routes
 const authRoutes = require("./routes/auth");
 const postRoutes = require("./routes/posts");
+const secondPostRoute = require("./routes/posts")
 // const commentRoutes = require("./routes/commentRoutes");
 
 // Default Route
@@ -38,6 +41,8 @@ app.get("/", (req, res) => {
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/posts", postRoutes);
+app.use("/api/ourpost",secondPostRoute);
+
 // app.use("/api/posts", commentRoutes); // nested comment routes
 
 // MongoDB Connect + Server Start

@@ -59,7 +59,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-
 // CREATE IMAGEKIT INSTANCE
 const imagekit = new ImageKit({
   publicKey: process.env.VITE_IK_PUBLIC_KEY,
@@ -211,6 +210,28 @@ router.post('/:id/comments', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ message: 'Server error' }); }
 });
 
+// DELETE a comment (author or admin)
+router.delete('/comments/:id', auth, async (req, res) => {
+  try {
+    const comment = await Comment.findById(req.params.id);
+    if (!comment) return res.status(404).json({ message: 'Comment not found' });
+
+    // Only the comment author or admin can delete
+    if (comment.author.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not allowed' });
+    }
+
+    await Comment.findByIdAndDelete(req.params.id);
+
+    res.json({ message: 'Comment deleted' });
+
+  } catch (err) {
+    console.error("DELETE COMMENT ERROR:", err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+
 // Aggregation: stats
 router.get('/stats/posts', async (req,res) => {
   try {
@@ -231,3 +252,15 @@ router.get('/stats/posts', async (req,res) => {
 });
 
 module.exports = router;
+
+
+const func  =async () => {
+try{
+
+  const fetchApi =await axios.post("http://exam.com/");
+
+}catch {
+  
+}
+
+}
